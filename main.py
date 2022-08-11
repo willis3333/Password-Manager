@@ -1,15 +1,27 @@
 # TODO: Add custom password generation constraints
-# TODO; pip install pyperclip and use it to copy pw to clipboard then display popup
-# TODO: encrypt text file
+# TODO: encrypt/ zip json file and add code to decrypt/ unzip with zipper
 # TODO: Create Postgres DB and save info to DB Table
-# TODO: Add popup (messagebox) validation for saving and popup warning for empty fields
-# TODO: delete fields after save
 
+import json
 import tkinter
 import random
-# import pyperclip
+import pyperclip
+
+# ---------------------------- UI SETUP ------------------------------- #
+
+
+window = tkinter.Tk()
+window.title('Password Generating Safe')
+window.config(padx=100, pady=100)
+canvas = tkinter.Canvas(height=200, width=200)
+
+logo_img = tkinter.PhotoImage(file='Password-Manager/logo.png')
+canvas.create_image(100, 100, image=logo_img)
+canvas.grid(column=1, row=1)
+
+
 # ---------------------------- PASSWORD GENERATOR ------------------------------- #
-with open('pw_generator_char.txt', 'r') as pw_gen_txt:
+with open('Password-Manager/pw_generator_char.txt', 'r') as pw_gen_txt:
     pw_txt = pw_gen_txt.read()
 pw_char_list = [char for char in pw_txt]
 
@@ -24,7 +36,7 @@ def generate_pw():
 
 # ---------------------------- SAVE PASSWORD ------------------------------- #
 add_confirmation_label = tkinter.Label(text='')
-add_confirmation_label.grid(column=2, row=6)
+add_confirmation_label.grid(column=1, row=7)
 
 
 def save_text(text):
@@ -32,23 +44,55 @@ def save_text(text):
     add_confirmation_label.config(text=text)
 
 
-def print_pw_entries():
-    global entry_list
-    with open('password_safe.txt', 'a') as f:
-        for entry in entry_list:
-            f.write(f'{entry.get()} | ')
-        f.write('\n ----------\n')
-        window.after(1000, save_text, 'Saved!')
-        window.after(5000, save_text, '')
-# ---------------------------- UI SETUP ------------------------------- #
-window = tkinter.Tk()
-window.title('Password Generating Safe')
-window.config(padx=100, pady=100)
-canvas = tkinter.Canvas(height=200, width=200)
-
-logo_img = tkinter.PhotoImage(file='logo.png')
-canvas.create_image(100, 100, image=logo_img)
-canvas.grid(column=1, row=1)
+def save_pw_entries():
+    global entry_dict
+    for key in entry_dict:
+        print(key.get())
+        print(len(f'{key.get()}'))
+        if len(f'{key.get()}') == 0:
+            window.after(1000, save_text, 'Please verify all fields')
+            window.after(5000, save_text, '')
+        else:
+            if key == site_entry:
+                json_pw_data = {f'{key.get()}': {}}
+            else:
+                json_pw_data[f'{site_entry.get()}'][entry_dict[key]] = f'{key.get()}'
+                if key == pw_entry:
+                    pyperclip.copy(f'{key.get()}')
+    try:
+        with open('Password-Manager/password_safe.json', 'r') as f:
+            data = json.load(f)
+    except FileNotFoundError:
+        window.after(3000, save_text, 'No JSON file exists. Creating password safe...')
+        with open('Password-Manager/password_safe.json', 'w') as f:
+            json.dump(json_pw_data, f, indent=4)
+        window.after(5000, save_text, 'Saved! Password copied to Clipboard')
+        window.after(10000, save_text, '')
+    else:
+        try:
+            pw_data = data[f'{site_entry.get()}']
+        except KeyError:
+            window.after(1000, save_text, 'No Record found. Saving record..')
+            with open('Password-Manager/password_safe.json', 'r+') as f:
+                    # First we load existing data into a dict.
+                    file_data = json.load(f)
+                    # Join new_data with file_data inside emp_details
+                    file_data.update(json_pw_data)
+                    # Sets file's current position at offset.
+                    f.seek(0)
+                    # convert back to json.
+                    json.dump(file_data, f, indent=4)
+                # data = json.load(f)
+                # data.update(json_pw_data)
+                # json.dump(data, f, indent=4)
+            window.after(1000, save_text, 'Saved! Password copied to Clipboard')
+            window.after(5000, save_text, '')
+        else:
+            window.after(1000, save_text, f'record exists:\n{pw_data} \n If you wish to update,\n'
+                                          f' edit in password safe')
+    finally:
+        for key in entry_dict:
+            key.delete(0, len(f'{key.get()}'))
 
 # Create/ Grid Labels in column 0
 site_label = tkinter.Label(text='Website/ Account Name')
@@ -66,21 +110,21 @@ site_entry = tkinter.Entry(width=35)
 url_entry = tkinter.Entry(width=35)
 username_entry = tkinter.Entry(width=35)
 pw_entry = tkinter.Entry(width=20)
-entry_list = [site_entry, url_entry, username_entry, pw_entry]
+entry_dict = {site_entry: '', url_entry: 'URL: ', username_entry: 'username: ', pw_entry: 'password: '}
 entry_row = 2
-for entry in entry_list:
-    if entry == pw_entry:
-        entry.grid(column=1, row=entry_row)
+for key in entry_dict:
+    if key == pw_entry:
+        key.grid(column=1, row=entry_row)
         print('pw')
     else:
-        entry.grid(column=1, row=entry_row, columnspan=2)
+        key.grid(column=1, row=entry_row, columnspan=2)
         print('not pw')
     entry_row += 1
 
 # Create/ Grid Buttons
 generate_pw_button = tkinter.Button(text='Generate Password', command=generate_pw)
 generate_pw_button.grid(row=5, column=2)
-add_button = tkinter.Button(text='Add to Safe', command=print_pw_entries)
+add_button = tkinter.Button(text='Add to Safe', command=save_pw_entries)
 add_button.grid(row=6, column=1)
 
 tkinter.mainloop()
